@@ -58,9 +58,9 @@ BASEIMAGE_RELEASE=$(shell cat ./.baseimage-release)
 DOCKER_TAG=$(ARCH)-$(PROJECT_VERSION)
 BASE_DOCKER_TAG=$(ARCH)-$(BASEIMAGE_RELEASE)
 
-EXECUTABLES = go docker git curl
-K := $(foreach exec,$(EXECUTABLES),\
-	$(if $(shell which $(exec)),some string,$(error "No $(exec) in PATH: Check dependencies")))
+# EXECUTABLES = go docker git curl
+# K := $(foreach exec,$(EXECUTABLES),\
+# 	$(if $(shell which $(exec)),some string,$(error "No $(exec) in PATH: Check dependencies")))
 
 # SUBDIRS are components that have their own Makefiles that we can invoke
 SUBDIRS = gotools sdk/node
@@ -69,6 +69,10 @@ SUBDIRS:=$(strip $(SUBDIRS))
 JAVASHIM_DEPS =  $(shell git ls-files core/chaincode/shim/java)
 PROJECT_FILES = $(shell git ls-files)
 IMAGES = src ccenv peer membersrvc javaenv
+
+PWD := $(shell pwd)
+IMAGE := ckeyer/obc:dev
+INNER_GOPATH := /opt/gopath
 
 all: peer membersrvc checks
 
@@ -258,3 +262,14 @@ clean: images-clean $(filter-out gotools-clean, $(SUBDIRS:=-clean))
 .PHONY: dist-clean
 dist-clean: clean gotools-clean
 	-@rm -rf /var/hyperledger/* ||:
+
+dev:
+	docker run --rm \
+	 --name dev \
+	 -v $(PWD):$(INNER_GOPATH)/src/$(PKGNAME) \
+	 -w $(INNER_GOPATH)/src/$(PKGNAME) \
+	 -v /var/run/docker.sock:/var/run/docker.sock \
+	 -it $(IMAGE) bash
+
+build-local:
+	go run -o bin/farmer peer/main.go
