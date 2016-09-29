@@ -14,6 +14,48 @@
 			"revisionTime": "2016-07-16T02:56:31Z"
 		},
 		{
+			"checksumSHA1": "zUacOSoeDL0MXqzd/OQPDp2QJeg=",
+			"path": "github.com/btcsuite/btcd/btcec",
+			"revision": "daac24626e01996e925c3f55d371d460b25e4c6d",
+			"revisionTime": "2016-09-20T06:16:08Z"
+		},
+		{
+			"checksumSHA1": "Or7JBEOYS7o4DXXOenIO17iNQWs=",
+			"path": "github.com/btcsuite/btcutil/base58",
+			"revision": "68e5965458062d031a6e333b35c778ce464fb73f",
+			"revisionTime": "2016-08-17T18:13:29Z"
+		},
+		{
+			"checksumSHA1": "xowWqSavv3sZfo4VZDpZTgql1lY=",
+			"path": "github.com/btcsuite/fastsha256",
+			"revision": "637e656429416087660c84436a2a035d69d54e2e",
+			"revisionTime": "2016-08-15T19:38:21Z"
+		},
+		{
+			"checksumSHA1": "fcfxNsCuheCrubAAl6zWgimCnLY=",
+			"path": "github.com/codegangsta/inject",
+			"revision": "33e0aa1cb7c019ccc3fbe049a8262a6403d30504",
+			"revisionTime": "2015-01-14T23:56:00Z"
+		},
+		{
+			"checksumSHA1": "cIIMVM13iFdsNg5K2nwFVJRnDqE=",
+			"path": "github.com/conseweb/common/hdwallet",
+			"revision": "ccaee49db1e6ab8a122ee8bc611f0ddf8c412e6c",
+			"revisionTime": "2016-09-23T08:31:28Z"
+		},
+		{
+			"checksumSHA1": "JXeXHdMq74v1Z5ZKZ3tUO//XRVE=",
+			"path": "github.com/conseweb/common/passphrase",
+			"revision": "ccaee49db1e6ab8a122ee8bc611f0ddf8c412e6c",
+			"revisionTime": "2016-09-23T08:31:28Z"
+		},
+		{
+			"checksumSHA1": "gS0uF7dvZqg9fySRMyrPae914uQ=",
+			"path": "github.com/conseweb/common/protos",
+			"revision": "ccaee49db1e6ab8a122ee8bc611f0ddf8c412e6c",
+			"revisionTime": "2016-09-23T08:31:28Z"
+		},
+		{
 			"path": "github.com/cpuguy83/go-md2man/md2man",
 			"revision": "71acacd42f85e5e82f70a55327789582a5200a90",
 			"revisionTime": "2015-08-03T11:35:22-04:00"
@@ -138,6 +180,12 @@
 			"revisionTime": "2016-07-25T13:44:23Z"
 		},
 		{
+			"checksumSHA1": "XnW//4UwBesH+iISkne+FaSICyU=",
+			"path": "github.com/go-martini/martini",
+			"revision": "dafdd96c12087352f3cf407b8f2a058028edf715",
+			"revisionTime": "2016-02-15T07:46:30Z"
+		},
+		{
 			"path": "github.com/gocraft/web",
 			"revision": "3fd2ffd35c9233bfe91caa84e9c09d7cf8fae964",
 			"revisionTime": "2015-10-06T12:17:10-04:00"
@@ -220,6 +268,18 @@
 			"revisionTime": "2015-07-31T22:42:12+02:00"
 		},
 		{
+			"checksumSHA1": "zlwOW/qUO9y3lzmJc9/qG0L72b4=",
+			"path": "github.com/martini-contrib/cors",
+			"revision": "553b9208d353a39b0850c02355f478ba020c86d7",
+			"revisionTime": "2014-10-16T00:30:11Z"
+		},
+		{
+			"checksumSHA1": "WMoHBLFJLLvhzbnatHIY+SgrrFI=",
+			"path": "github.com/martini-contrib/render",
+			"revision": "ec18f8345a1181146728238980606fb1d6f40e8c",
+			"revisionTime": "2015-07-07T14:21:08Z"
+		},
+		{
 			"path": "github.com/mattn/go-sqlite3",
 			"revision": "5651a9d9d49ec25811d08220ee972080378d52ea",
 			"revisionTime": "2015-11-06T23:54:04+09:00"
@@ -239,6 +299,12 @@
 			"path": "github.com/opencontainers/runc/libcontainer/user",
 			"revision": "8033a839758ab9a4ed4fb590d1bb005a1c5a164e",
 			"revisionTime": "2016-07-26T03:30:17Z"
+		},
+		{
+			"checksumSHA1": "uG/irJIgifYdc+HC1kF6Gwgn7kU=",
+			"path": "github.com/oxtoacart/bpool",
+			"revision": "4e1c5567d7c2dd59fa4c7c83d34c2f3528b025d6",
+			"revisionTime": "2015-07-12T13:31:11Z"
 		},
 		{
 			"checksumSHA1": "LuFv4/jlrmFNnDb/5SCSEPAM9vU=",
@@ -325,9 +391,33 @@
 			"revisionTime": "2016-01-29T22:06:01+01:00"
 		},
 		{
+			"checksumSHA1": "vE43s37+4CJ2CDU6TlOUOYE0K9c=",
+			"path": "golang.org/x/crypto/bcrypt",
+			"revision": "595bbbd7f5f308415a544d3c55743c91427c8d99",
+			"revisionTime": "2016-08-11T15:03:39Z"
+		},
+		{
+			"checksumSHA1": "JsJdKXhz87gWenMwBeejTOeNE7k=",
+			"path": "golang.org/x/crypto/blowfish",
+			"revision": "595bbbd7f5f308415a544d3c55743c91427c8d99",
+			"revisionTime": "2016-08-11T15:03:39Z"
+		},
+		{
 			"path": "golang.org/x/crypto/hkdf",
 			"revision": "c8b9e6388ef638d5a8a9d865c634befdc46a6784",
 			"revisionTime": "2015-06-18T17:47:17-07:00"
+		},
+		{
+			"checksumSHA1": "1MGpGDQqnUoRpv7VEcQrXOBydXE=",
+			"path": "golang.org/x/crypto/pbkdf2",
+			"revision": "595bbbd7f5f308415a544d3c55743c91427c8d99",
+			"revisionTime": "2016-08-11T15:03:39Z"
+		},
+		{
+			"checksumSHA1": "y/oIaxq2d3WPizRZfVjo8RCRYTU=",
+			"path": "golang.org/x/crypto/ripemd160",
+			"revision": "595bbbd7f5f308415a544d3c55743c91427c8d99",
+			"revisionTime": "2016-08-11T15:03:39Z"
 		},
 		{
 			"path": "golang.org/x/crypto/sha3",

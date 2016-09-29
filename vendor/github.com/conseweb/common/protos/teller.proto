@@ -1,0 +1,143 @@
+/*
+Copyright Mojing Inc. 2016 All Rights Reserved.
+Written by mint.zhao.chiu@gmail.com. github.com: https://www.github.com/mintzhao
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+		 http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+syntax = "proto3";
+
+package protos;
+
+import "error.proto";
+
+service LotteryAPI {
+    // returns next lottery info, something about time begin, end etc...
+    rpc NextLotteryInfo(NextLotteryInfoReq) returns (NextLotteryInfoRsp) {}
+    // receive lottery number form farmer
+    rpc SendLotteryFx(SendLotteryFxReq) returns (SendLotteryFxRsp) {}
+    // receive lottery number form ledger
+    rpc SendLotteryLx(SendLotteryLxReq) returns (SendLotteryLxRsp) {}
+    // send a command to start new round of lottery immediately
+    rpc StartLottery(StartLotteryReq) returns (StartLotteryRsp) {}
+    // get lottery result to verify or someelse use
+    rpc GetLotteryResult(GetLotteryResultReq) returns (GetLotteryResultRsp) {}
+}
+
+// NextLotteryInfoReq
+message NextLotteryInfoReq {}
+
+// NextLotteryInfoRsp
+message NextLotteryInfoRsp {
+    Error error = 1;
+    int64 startTime = 2;
+    int64 endTime =3;
+}
+
+// storage object of farmer lottery
+message LotteryFx {
+    string fid = 1;
+    uint64 value = 2;
+    // middle R, when teller receive farmer's lottery, so farmer's lottery relate to call queue.
+    uint64 mr = 3;
+    // when handle lottery, calculate the distence between fx and lx, first xx framers will be selected as the ledger's voter
+    // when selected, candidate will be ledger's ids, otherwise nothing
+    repeated string ledgers = 4;
+    uint64 dist = 5;
+}
+
+// storage object of ledger lottery
+message LotteryLx {
+    string lid = 1;
+    uint64 value = 2;
+    // the distence of value and end R
+    uint64 dist = 3;
+    // win a seat for ledger?
+    bool won = 4;
+    // farmers
+    repeated string farmers = 5;
+}
+
+// LotteryFxTicket farmer only
+message LotteryFxTicket {
+    string fid = 1;
+    uint64 fx = 2;
+    uint64 mr = 3;
+    int64 idx = 4;
+    string lotteryName = 5;
+}
+
+// SendLotteryFxReq
+message SendLotteryFxReq {
+    string fid = 1;
+    uint64 fx = 2;
+}
+
+// SendLotteryFxRsp
+message SendLotteryFxRsp {
+    Error error = 1;
+    LotteryFxTicket ticket = 2;
+}
+
+// LotteryLxTicket ledger only
+message LotteryLxTicket {
+    string lid = 1;
+    uint64 lx = 2;
+    string lotteryName = 3;
+}
+
+// SendLotteryLxReq
+message SendLotteryLxReq {
+    string lid = 1;
+    uint64 lx = 2;
+}
+
+// SendLotteryLxRsp
+message SendLotteryLxRsp {
+    Error error = 1;
+    LotteryLxTicket ticket = 2;
+}
+
+// StartLotteryReq
+message StartLotteryReq {
+    // when to start a new round of lottery, is a time utc timestamp, if smaller than NOW more than 1m, using now
+    int64 startUTC = 1;
+    // how long the round of lottery will last, using ms,s,m,h words, such as 30m means 30 minutes
+    string lastInterval = 2;
+}
+
+// StartLotteryRsp
+message StartLotteryRsp {
+    Error error = 1;
+}
+
+// GetLotteryResultReq
+message GetLotteryResultReq {
+    string lotteryName = 1;
+}
+
+// LotteryResult
+message LotteryResult {
+    string name = 1;
+    // farmer lottery list
+    repeated LotteryFx fxs = 2;
+    // ledger lottery list
+    repeated LotteryLx lxs = 3;
+}
+
+// GetLotteryResultRsp
+message GetLotteryResultRsp {
+    Error error = 1;
+    LotteryResult result = 2;
+}
+
