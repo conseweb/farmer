@@ -289,7 +289,7 @@ daemon:
 	./bin/farmer farmer start
 
 clean-runing-file:
-	rm -rf /var/run/farmer/*
+	rm -rf /var/hyperledger/production/*
 
 push:
 	rsync -vaz --delete \
