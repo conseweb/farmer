@@ -12,7 +12,7 @@ import (
 )
 
 type accountWrapper struct {
-	// sign type
+	// sign type email/phone
 	Type     string `json:"type"`
 	Email    string `json:"email"`
 	Phone    string `json:"phone"`
@@ -40,11 +40,30 @@ func (a *accountWrapper) SignUpArgus() (pb.SignUpType, string) {
 	return stype, svalue
 }
 
+func (a *accountWrapper) SignInArgus() (pb.SignInType, string) {
+	stype := pb.SignInType_SI_MOBILE
+	svalue := a.Phone
+
+	switch a.Type {
+	case "phone":
+	case "email":
+		stype = pb.SignInType_SI_EMAIL
+		svalue = a.Email
+	default:
+		if a.Email != "" {
+			stype = pb.SignInType_SI_EMAIL
+			svalue = a.Email
+		}
+	}
+	return stype, svalue
+}
+
 func (a *accountWrapper) ToAccount() (*account.Account, error) {
 	/// TODO: add check
 	return account.NewAccount(a.NickName, a.Phone, a.Email, a.Password, a.Language), nil
 }
 
+// POST /signup/:vtype
 func RegVerificationType(rw http.ResponseWriter, req *http.Request, ctx *RequestContext, params martini.Params) {
 	var user accountWrapper
 
@@ -74,6 +93,7 @@ func RegVerificationType(rw http.ResponseWriter, req *http.Request, ctx *Request
 	rw.WriteHeader(200)
 }
 
+// PUT /signup/captcha
 func VerifyCaptcha(rw http.ResponseWriter, req *http.Request, ctx *RequestContext) {
 	var user accountWrapper
 
@@ -103,6 +123,7 @@ func VerifyCaptcha(rw http.ResponseWriter, req *http.Request, ctx *RequestContex
 	rw.WriteHeader(200)
 }
 
+// POST /signup
 func Registry(rw http.ResponseWriter, req *http.Request, ctx *RequestContext) {
 	var user accountWrapper
 	err := json.NewDecoder(req.Body).Decode(&user)
@@ -118,6 +139,7 @@ func Registry(rw http.ResponseWriter, req *http.Request, ctx *RequestContext) {
 		return
 	}
 
+	// Try to new a Account.
 	acc, err := user.ToAccount()
 	if err != nil {
 		ctx.Error(400, err)
@@ -133,8 +155,43 @@ func Registry(rw http.ResponseWriter, req *http.Request, ctx *RequestContext) {
 }
 
 func Login(ctx *RequestContext) {
+	var user accountWrapper
+	json.NewDecoder(ctx.req.Body).Decode(&user)
+
+	cli, err := daemon.GetIDPClient()
+	if err != nil {
+		ctx.Error(500, err)
+		return
+	}
+
+	st, su := user.SignInArgus()
+	a, err := account.Login(cli, st, su, user.Password)
+	if err != nil {
+		ctx.Error(500, err)
+		return
+	}
+
+	daemon.ResetAccount(a)
 
 	ctx.res.WriteHeader(200)
+}
+
+func Logout(ctx *RequestContext) {
+
+	ctx.res.WriteHeader(200)
+}
+
+func UnbindDevide(rw http.ResponseWriter, req *http.Request, ctx *RequestContext) {
+	// registry
+	// cli, err := daemon.GetIDPClient()
+	// if err != nil {
+	// 	ctx.Error(500, err)
+	// 	return
+	// }
+}
+
+func BindDevide(rw http.ResponseWriter, req *http.Request, ctx *RequestContext) {
+
 }
 
 func OnlineAccount(ctx *RequestContext) {
@@ -148,5 +205,5 @@ func OfflineAccount(ctx *RequestContext) {
 }
 
 func GetAccountState(rw http.ResponseWriter, req *http.Request, rnd render.Render) {
-	rnd.JSON(200, map[string]string{"msg": "hello"})
+	rnd.JSON(200, daemon.Account)
 }

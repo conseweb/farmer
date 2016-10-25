@@ -2,7 +2,10 @@ package account
 
 import (
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/conseweb/common/hdwallet"
@@ -10,8 +13,8 @@ import (
 	"github.com/hyperledger/fabric/core/crypto/primitives"
 	"github.com/op/go-logging"
 	"github.com/spf13/viper"
-	// "golang.org/x/crypto/bcrypt"
 	"golang.org/x/net/context"
+	// "golang.org/x/crypto/bcrypt"
 	// "google.golang.org/grpc"
 )
 
@@ -40,6 +43,8 @@ type Account struct {
 	Passphrase string `json:"passphrase"`
 	Wallet     *hdwallet.HDWallet
 
+	Devices []Device
+
 	logger *logging.Logger
 }
 
@@ -64,20 +69,35 @@ func NewAccount(nickname, phone, email, pass, lang string) *Account {
 	}
 }
 
-func (a *Account) Login(client pb.FarmerPublicClient) error {
-	if a.ID == "" {
-		return fmt.Errorf("account id required")
+func LoadFromFile() (*Account, error) {
+	fpath := filepath.Join(viper.GetString("key"), "farmerAccount.json")
+
+	f, err := os.Open(fpath)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	a := new(Account)
+	err = json.NewDecoder(f).Decode(a)
+	if err != nil {
+		return nil, err
 	}
 
-	onlineReq := &pb.FarmerOnLineReq{FarmerID: a.ID}
-	a.logger.Debugf("login with %+v", a)
-	onlineRes, err := client.FarmerOnLine(context.Background(), onlineReq)
+	a.logger = logging.MustGetLogger("farmer")
+	return a, nil
+}
+
+func (a *Account) Save() error {
+	fpath := filepath.Join(viper.GetString("key"), "farmerAccount.json")
+	f, err := os.OpenFile(fpath, os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
 		return err
 	}
-	if onlineRes.Error != nil {
-		a.logger.Errorf("login error: %#v", onlineRes.Error)
-		return onlineRes.Error
+
+	err = json.NewEncoder(f).Encode(a)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -101,7 +121,7 @@ func (a *Account) Registry(idpCli pb.IDPPClient) error {
 		Pass:       a.Password,
 		UserType:   pb.UserType_NORMAL,
 
-		Wpub: []byte(a.Wallet.Pub().String()),
+		Wpub: a.Wallet.Pub().Serialize(),
 		Spub: pubraw,
 		Sign: []byte("ffff"),
 	}
@@ -113,21 +133,121 @@ func (a *Account) Registry(idpCli pb.IDPPClient) error {
 		regUser.SignUp = a.Email
 	}
 
-	rsp, err := idpCli.RegisterUser(context.Background(), regUser)
+	resp, err := idpCli.RegisterUser(context.Background(), regUser)
 	if err != nil {
 		return err
 	}
-	if rsp.GetError() != nil && rsp.GetError().ErrorType != pb.ErrorType_NONE_ERROR {
-		return rsp.GetError()
+	if resp.GetError() != nil && resp.GetError().ErrorType != pb.ErrorType_NONE_ERROR {
+		return resp.GetError()
 	}
 
-	ru := rsp.GetUser()
+	ru := resp.GetUser()
 	if ru == nil {
 		return fmt.Errorf("got nil user.")
 	}
 	a.ID = ru.UserID
 
-	a.Save()
+	// bind local device.
+	if err := a.BindLocalDevice(idpCli); err != nil {
+		a.logger.Errorf("bind failed, %v", err.Error())
+		return err
+	}
+
+	err = a.Save()
+	if err != nil {
+		a.logger.Errorf("account save local file failed, %v", err.Error())
+		return err
+	}
+
+	return nil
+}
+
+func Login(idpCli pb.IDPPClient, typ pb.SignInType, signup, password string) (a *Account, err error) {
+	req := &pb.LoginUserReq{
+		SignInType: typ,
+		SignIn:     signup,
+		Password:   password,
+		Sign:       []byte("ffff"),
+	}
+
+	resp, err := idpCli.LoginUser(context.Background(), req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.GetError() != nil && resp.GetError().ErrorType != pb.ErrorType_NONE_ERROR {
+		return nil, resp.GetError()
+	}
+
+	ru := resp.GetUser()
+	if ru == nil {
+		return nil, fmt.Errorf("got nil user.")
+	}
+	a = &Account{
+		ID:       ru.UserID,
+		Phone:    ru.Mobile,
+		Email:    ru.Email,
+		NickName: ru.Nick,
+		Devices:  []Device{},
+	}
+	exiLocal := false
+	for _, device := range ru.Devices {
+		if getLocalMAC() == device.Mac {
+			a.Devices = append(a.Devices, Device{Device: device, isLocal: true})
+			exiLocal = true
+		} else {
+			a.Devices = append(a.Devices, Device{Device: device})
+		}
+	}
+	if !exiLocal {
+		// try to bind device.
+		if err := a.BindLocalDevice(idpCli); err != nil {
+			a.logger.Errorf("bind failed, %v", err.Error())
+			return a, err
+		}
+	}
+
+	err = a.Save()
+	if err != nil {
+		a.logger.Errorf("account save local file failed, %v", err.Error())
+		return a, err
+	}
+
+	return a, nil
+}
+
+func (a *Account) BindLocalDevice(idpCli pb.IDPPClient) error {
+	priv, err := primitives.NewECDSAKey()
+	if err != nil {
+		return err
+	}
+
+	pubraw, err := x509.MarshalPKIXPublicKey(&priv.PublicKey)
+	if err != nil {
+		return err
+	}
+
+	dv := a.NewLocalDevice()
+	devReq := &pb.BindDeviceReq{
+		UserID: a.ID,
+		Os:     dv.Os,
+		For:    pb.DeviceFor_FARMER,
+		Mac:    dv.Mac,
+		Alias:  dv.Alias,
+
+		Wpub: []byte(dv.Wpub),
+		// device signature public key
+		Spub: pubraw,
+
+		Sign: []byte("ffff"),
+	}
+
+	resp, err := idpCli.BindDeviceForUser(context.Background(), devReq)
+	if err != nil {
+		a.logger.Errorf("BindDevice failed, %v", err.Error())
+		return err
+	}
+
+	a.Devices = append(a.Devices, Device{Device: resp.Device, Wallet: dv.Wallet, isLocal: true})
 	return nil
 }
 
@@ -135,6 +255,32 @@ func (a *Account) Logout() error {
 	return nil
 }
 
-func (a *Account) Save() error {
+func (a *Account) Online(client pb.FarmerPublicClient) error {
+	if a.ID == "" {
+		return fmt.Errorf("account id required")
+	}
+
+	onlineReq := &pb.FarmerOnLineReq{FarmerID: a.ID}
+	a.logger.Debugf("login with %+v", a)
+
+	onlineRes, err := client.FarmerOnLine(context.Background(), onlineReq)
+	if err != nil {
+		return err
+	}
+	if onlineRes.Error != nil {
+		a.logger.Errorf("login error: %#v", onlineRes.Error)
+		return onlineRes.Error
+	}
+
 	return nil
+}
+
+func (a *Account) getSignInType() (st pb.SignInType, sv string) {
+	st, sv = pb.SignInType_SI_MOBILE, a.Phone
+	if a.ID != "" {
+		st, sv = pb.SignInType_SI_USERID, a.ID
+	} else if a.Email != "" {
+		st, sv = pb.SignInType_SI_EMAIL, a.Email
+	}
+	return
 }

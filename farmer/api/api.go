@@ -13,16 +13,15 @@ import (
 	"github.com/martini-contrib/cors"
 	"github.com/martini-contrib/render"
 	"github.com/op/go-logging"
-	// "github.com/googollee/go-socket.io"
 )
 
 const (
-	API_PREFIX = "/api"
+	API_PREFIX      = "/api"
+	SOCKETIO_PREFIX = "/socket.io"
 )
 
 var (
 	log         *logging.Logger
-	headers     map[string]string
 	daemon      *daepkg.Daemon
 	proxyClient *http.Client
 )
@@ -35,7 +34,7 @@ type RequestContext struct {
 	rnd render.Render
 	res http.ResponseWriter
 
-	eventChan chan string
+	evt *EventHandler
 }
 
 type EventClient struct {
@@ -46,18 +45,9 @@ type eventHandle struct {
 	es map[string]EventClient
 }
 
-func init() {
-	headers = make(map[string]string)
-	headers["Access-Control-Allow-Origin"] = "*"
-	headers["Access-Control-Allow-Methods"] = "GET,OPTIONS,POST,DELETE,PUT"
-	headers["Access-Control-Allow-Credentials"] = "true"
-	headers["Access-Control-Max-Age"] = "864000"
-	headers["Access-Control-Expose-Headers"] = "Record-Count,Limt,Offset,Content-Type"
-	headers["Access-Control-Allow-Headers"] = "Limt,Offset,Content-Type,Origin,Accept,Authorization"
-}
-
 func notFound(w http.ResponseWriter, req *http.Request) {
-	if strings.HasPrefix(req.URL.Path, API_PREFIX) {
+	if strings.HasPrefix(req.URL.Path, API_PREFIX) ||
+		strings.HasPrefix(req.URL.Path, SOCKETIO_PREFIX) {
 		w.WriteHeader(http.StatusNotFound)
 	}
 }
@@ -68,36 +58,39 @@ func Serve(d *daepkg.Daemon) error {
 	listenAddr := d.ListenAddr
 
 	m := NewMartini()
-	// view := views.New()
-	// m.NotFound(NotFound, view.ServeHTTP)
 
 	m.Use(cors.Allow(&cors.Options{
-		AllowOrigins:     strings.Split(headers["Access-Control-Allow-Origin"], ","),
-		AllowMethods:     strings.Split(headers["Access-Control-Allow-Methods"], ","),
-		AllowHeaders:     strings.Split(headers["Access-Control-Allow-Headers"], ","),
-		ExposeHeaders:    strings.Split(headers["Access-Control-Expose-Headers"], ","),
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"GET", "PATCH", "POST", "DELETE", "PUT"},
+		AllowHeaders:     []string{"Limt", "Offset", "Content-Type", "Origin", "Accept", "Authorization"},
+		ExposeHeaders:    []string{"Record-Count", "Limt", "Offset", "Content-Type"},
 		AllowCredentials: true,
 		MaxAge:           time.Second * 864000,
 	}))
 
 	view := views.New()
 	m.NotFound(notFound, view.ServeHTTP)
+
+	evt := NewEventHandler()
+	m.Map(evt)
+
 	m.Use(requextCtx)
 
+	m.Any(SOCKETIO_PREFIX, evt.ServeHTTP)
 	m.Group(API_PREFIX, func(r martini.Router) {
 		r.Group("/signup", func(r martini.Router) {
 			r.Post("", Registry)
 			r.Post("/:vtype", RegVerificationType)
 			r.Put("/captcha", VerifyCaptcha)
 		})
+
 		r.Group("/account", func(r martini.Router) {
-			r.Get("/state", GetAccountState)
-			r.Post("/login", Registry)
-			r.Delete("/logout", Hello)
+			r.Get("", GetAccountState)
+			r.Post("/login", Login)
+			r.Delete("/logout", Logout)
 			r.Patch("/setting", Hello)
 		})
 		r.Group("/device", func(r martini.Router) {
-			r.Get("")
 			r.Post("/bind", Hello)
 			r.Delete("/unbind", Hello)
 		})
@@ -107,9 +100,13 @@ func Serve(d *daepkg.Daemon) error {
 			r.Patch("/stop", StopPeer)
 			r.Patch("/restart", RestartPeer)
 		})
+		r.Group("/metrics", func(r martini.Router) {
+			r.Get("", GetMetrics)
+		})
 
 		r.Any("/chain/**", ProxyFabric)
-		r.Any("/chaincode/**", ProxyFabric)
+		r.Any("/chaincode/**", ProxyChaincode, ProxyFabric)
+		r.Any("/devops/**", ProxyFabric)
 		r.Any("/registrar/**", ProxyFabric)
 		r.Any("/transactions/**", ProxyFabric)
 		r.Any("/network/**", ProxyFabric)
@@ -135,12 +132,13 @@ func NewMartini() *martini.ClassicMartini {
 	return &martini.ClassicMartini{Martini: m, Router: r}
 }
 
-func requextCtx(w http.ResponseWriter, req *http.Request, mc martini.Context, rnd render.Render) {
+func requextCtx(w http.ResponseWriter, req *http.Request, mc martini.Context, rnd render.Render, evt *EventHandler) {
 	ctx := &RequestContext{
 		res:    w,
 		req:    req,
 		mc:     mc,
 		rnd:    rnd,
+		evt:    evt,
 		params: make(map[string]string),
 	}
 

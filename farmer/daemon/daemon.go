@@ -1,10 +1,11 @@
 package daemon
 
 import (
+	"database/sql"
 	"fmt"
-	"github.com/hyperledger/fabric/peer/node"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -12,19 +13,15 @@ import (
 
 	pb "github.com/conseweb/common/protos"
 	"github.com/hyperledger/fabric/farmer/account"
+	"github.com/hyperledger/fabric/peer/node"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/op/go-logging"
 	"github.com/spf13/viper"
 	"google.golang.org/grpc"
-	// fpb "github.com/hyperledger/fabric/protos"
-	// "golang.org/x/net/context"
-	// "google/protobuf"
 )
 
 const (
 	DefaultListenAddr = ":9375"
-	DefaultFarmerPath = "/var/run/farmer"
-	// DefaultSocketFile    = DefaultFarmerPath + "/farmer.sock"
-	DefaultPidFile = DefaultFarmerPath + "/farmer.pid"
 
 	// for grpc
 	DefaultSupervisorAddr = ":9376"
@@ -42,8 +39,9 @@ type Daemon struct {
 	IDProviderAddr string
 	ListenAddr     string
 	RESTURL        string
+	RootFS         string
 
-	farmerAccount *account.Account
+	Account *account.Account
 
 	pid    int
 	exitCh chan error
@@ -53,6 +51,9 @@ type Daemon struct {
 	idproviderConn *grpc.ClientConn
 	svCli          pb.FarmerPublicClient
 	idppCli        pb.IDPPClient
+
+	// used save account info.
+	localDB *sql.DB
 }
 
 func NewDaemon() *Daemon {
@@ -61,9 +62,9 @@ func NewDaemon() *Daemon {
 		IDProviderAddr: DefaultIDProviderAddr,
 		ListenAddr:     DefaultListenAddr,
 		RESTURL:        viper.GetString("rest.address"),
-
-		pid:    os.Getpid(),
-		exitCh: make(chan error),
+		RootFS:         viper.GetString("peer.fileSystemPath"),
+		pid:            os.Getpid(),
+		exitCh:         make(chan error),
 	}
 
 	svAddr := viper.GetString("farmer.supervisorAddress")
@@ -83,13 +84,49 @@ func NewDaemon() *Daemon {
 		d.ListenAddr = listenAddr
 	}
 
+	a, err := account.LoadFromFile()
+	if err != nil {
+		d.GetLogger().Errorf("load account failed", err)
+	}
+	if a != nil {
+		d.Account = a
+	}
+
 	return d
+}
+
+//
+type dbHandler interface {
+	InitDB(db *sql.DB) error
 }
 
 func (d *Daemon) Init() error {
 	if err := d.writePid(); err != nil {
 		return err
 	}
+
+	// db, err := sql.Open("sqlite3", filepath.Join(viper.GetString("peer.fileSystemPath"), "farmerKV.db"))
+	// if err != nil {
+	// 	return err
+	// }
+
+	// if err := db.Ping(); err != nil {
+	// 	return err
+	// }
+
+	// // for init db, e. create tables.
+	// for _, h := range []dbHandler{
+	// 	&account.Account{},
+	// 	&account.Device{},
+	// } {
+	// 	if err := h.InitDB(db); err != nil {
+	// 		logger.Errorf("init db failed, error: %s", err.Error())
+	// 		return err
+	// 	}
+	// }
+
+	// d.localDB = db
+
 	return nil
 }
 
@@ -106,14 +143,22 @@ func (d *Daemon) WaitExit() {
 	}
 }
 
+func pidFilePath() string {
+	return filepath.Join(viper.GetString("peer.fileSystemPath"), "farmer.pid")
+}
+
 func (d *Daemon) writePid() error {
-	f, err := os.OpenFile(DefaultPidFile, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0644)
+	f, err := os.OpenFile(pidFilePath(), os.O_CREATE|os.O_EXCL|os.O_RDWR, 0644)
 	if err != nil {
 		return fmt.Errorf("Write Pid File failed, error: %s", err.Error())
 	}
 	defer f.Close()
 
-	fmt.Fprintf(f, "%d", os.Getpid())
+	_, err = fmt.Fprintf(f, "%d", os.Getpid())
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -126,7 +171,7 @@ func (d *Daemon) Exit(err error) {
 		close(d.exitCh)
 	}
 
-	os.RemoveAll(DefaultPidFile)
+	os.RemoveAll(pidFilePath())
 	d.CloseConn()
 
 	time.Sleep(3 * time.Second)
@@ -149,7 +194,7 @@ func (d *Daemon) ResetAccount(a *account.Account) {
 	d.Lock()
 	defer d.Unlock()
 	if a != nil {
-		d.farmerAccount = a
+		d.Account = a
 	}
 }
 
@@ -174,6 +219,7 @@ func (d *Daemon) GetRESTAddr() string {
 }
 
 func (d *Daemon) StartPeer() error {
+	d.GetLogger().Debugf("try to start node")
 	return node.Start()
 }
 
