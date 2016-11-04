@@ -105,27 +105,10 @@ func (d *Daemon) Init() error {
 		return err
 	}
 
-	// db, err := sql.Open("sqlite3", filepath.Join(viper.GetString("peer.fileSystemPath"), "farmerKV.db"))
-	// if err != nil {
-	// 	return err
-	// }
-
-	// if err := db.Ping(); err != nil {
-	// 	return err
-	// }
-
-	// // for init db, e. create tables.
-	// for _, h := range []dbHandler{
-	// 	&account.Account{},
-	// 	&account.Device{},
-	// } {
-	// 	if err := h.InitDB(db); err != nil {
-	// 		logger.Errorf("init db failed, error: %s", err.Error())
-	// 		return err
-	// 	}
-	// }
-
-	// d.localDB = db
+	a, err := account.LoadFromFile()
+	if err == nil && a != nil {
+		d.Account = a
+	}
 
 	return nil
 }
@@ -174,7 +157,7 @@ func (d *Daemon) Exit(err error) {
 	os.RemoveAll(pidFilePath())
 	d.CloseConn()
 
-	time.Sleep(3 * time.Second)
+	time.Sleep(1 * time.Second)
 	if err != nil {
 		logger.Errorf("farmer daemon(PID: %d) exit by error: %s", d.pid, err)
 	} else {

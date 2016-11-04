@@ -172,8 +172,9 @@ func Login(ctx *RequestContext) {
 	}
 
 	daemon.ResetAccount(a)
+	log.Debugf("set nuew account %+v", a)
 
-	ctx.res.WriteHeader(200)
+	ctx.rnd.JSON(200, a)
 }
 
 func Logout(ctx *RequestContext) {
@@ -204,6 +205,10 @@ func OfflineAccount(ctx *RequestContext) {
 	ctx.res.WriteHeader(200)
 }
 
-func GetAccountState(rw http.ResponseWriter, req *http.Request, rnd render.Render) {
+func GetAccountState(rw http.ResponseWriter, req *http.Request, ctx *RequestContext, rnd render.Render) {
+	if daemon.Account == nil {
+		ctx.Error(404, "not found account")
+		return
+	}
 	rnd.JSON(200, daemon.Account)
 }
