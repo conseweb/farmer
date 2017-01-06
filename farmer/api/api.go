@@ -190,10 +190,14 @@ func Serve(d *daepkg.Daemon) error {
 
 			/// file indexer
 			r.Group("/indexer", func(r martini.Router) {
-				r.Post("/online/:device_id", OnlineDevice)
-				r.Post("/offline/:device_id", OfflineDevice)
-				r.Post("/files/:device_id", SetFileIndex)
-				r.Get("/address/:file_id", GetFileAddr)
+				r.Post("/devices/:device_id/online", OnlineDevice)
+				r.Post("/devices/:device_id/offline", OfflineDevice)
+				r.Post("/devices/:device_id/files", SetFileIndex)
+
+				r.Post("/files", UpdateFileIndex)
+				r.Get("/files/:file_id", GetFileAddr)
+				r.Delete("/files/:file_id", DeleteFileIndex)
+
 			}, SetIndexerDBMW)
 
 			// filesystem

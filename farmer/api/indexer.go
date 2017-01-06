@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 
 	"github.com/go-martini/martini"
@@ -68,6 +69,12 @@ func SetFileIndex(ctx *RequestContext, orm *xorm.Engine, params martini.Params) 
 			ctx.Error(500, err)
 			return
 		}
+	} else {
+		filePaths := []interface{}{}
+		for _, file := range files {
+			filePaths = append(filePaths, file.Path)
+		}
+		orm.Where("device_id = ?", devID).In("path", filePaths).Delete(&indexer.FileInfo{})
 	}
 
 	insrt := []interface{}{}
@@ -83,6 +90,49 @@ func SetFileIndex(ctx *RequestContext, orm *xorm.Engine, params martini.Params) 
 	}
 
 	ctx.Message(201, n)
+}
+
+func UpdateFileIndex(ctx *RequestContext, orm *xorm.Engine, params martini.Params) {
+	file := &indexer.FileInfo{}
+	err := json.NewDecoder(ctx.req.Body).Decode(file)
+	if err != nil {
+		ctx.Error(400, err)
+		return
+	}
+
+	n, err := orm.Where("file_id = ?", file.ID).Update(file)
+	if err != nil {
+		ctx.Error(500, err)
+		return
+	}
+
+	if n == 0 {
+		ctx.Error(404, fmt.Errorf("not found file %v", file.ID))
+		return
+	}
+
+	ctx.Message(200, file)
+}
+
+func DeleteFileIndex(ctx *RequestContext, orm *xorm.Engine, params martini.Params) {
+	fID, err := strconv.Atoi(params["file_id"])
+	if err != nil {
+		ctx.Error(400, "invalid params file_id")
+		return
+	}
+
+	n, err := orm.Where("file_id = ?", int64(fID)).Delete(&indexer.FileInfo{})
+	if err != nil {
+		ctx.Error(500, err)
+		return
+	}
+
+	if n == 0 {
+		ctx.Error(404, fmt.Errorf("not found file %v", fID))
+		return
+	}
+
+	ctx.Message(200, "ok")
 }
 
 func OnlineDevice(ctx *RequestContext, orm *xorm.Engine, params martini.Params) {
