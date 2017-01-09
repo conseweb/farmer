@@ -3,8 +3,6 @@ package api
 import (
 	"encoding/json"
 	"net/http"
-
-	"github.com/go-martini/martini"
 )
 
 // POST /nameservice/deploy
@@ -59,8 +57,25 @@ func NewNameServiceKV(ctx *RequestContext) {
 	ctx.res.WriteHeader(201)
 }
 
-func RemoveNameServiceKV(ctx *RequestContext, params martini.Params) {
-	cc, err := ccManager.Get("nameservice", "invoke", "deloto", params["key"])
+func GetNameServiceVal(ctx *RequestContext) {
+	cc, err := ccManager.Get("nameservice", "query", "query", ctx.params["name"])
+	if err != nil {
+		ctx.Error(500, err)
+		return
+	}
+
+	bs, err := cc.Query()
+	if err != nil {
+		ctx.Error(500, err)
+		return
+	}
+
+	ctx.res.Write(bs)
+	ctx.res.WriteHeader(200)
+}
+
+func RemoveNameServiceKV(ctx *RequestContext) {
+	cc, err := ccManager.Get("nameservice", "invoke", "deloto", ctx.params["name"])
 	if err != nil {
 		ctx.Error(500, err)
 		return
