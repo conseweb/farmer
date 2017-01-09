@@ -312,7 +312,7 @@ dev:
 	 -v /data:/data \
 	 -it $(IMAGE) bash
 
-local: local-build daemon
+local: local-build query
 
 local-build:
 	go build -o bin/farmer ./peer/main.go
@@ -349,3 +349,5 @@ invoke:
 invoke2:
 	$(BIN) chaincode invoke -n $(CHAINCODE) -c '{"Function":"invoke_transfer", "Args": [ ]}'
  
+query:
+	./bin/farmer namesrv query -a http://u5.mj:9375 g.cn

@@ -184,7 +184,8 @@ func Serve(d *daepkg.Daemon) error {
 			r.Group("/namesrv", func(r martini.Router) {
 				r.Post("/deploy", DeployNameService)
 				r.Post("/new", NewNameServiceKV)
-				r.Delete("/:key", RemoveNameServiceKV)
+				r.Get("", GetNameServiceVal)
+				r.Delete("", RemoveNameServiceKV)
 			}, DeployNameSrvnMW)
 
 			/// file indexer
