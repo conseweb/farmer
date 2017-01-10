@@ -18,7 +18,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/hyperledger/fabric/peer/namesrv"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -35,6 +34,8 @@ import (
 	"github.com/hyperledger/fabric/flogging"
 	"github.com/hyperledger/fabric/peer/chaincode"
 	"github.com/hyperledger/fabric/peer/farmer"
+	"github.com/hyperledger/fabric/peer/fs"
+	"github.com/hyperledger/fabric/peer/namesrv"
 	"github.com/hyperledger/fabric/peer/network"
 	"github.com/hyperledger/fabric/peer/node"
 	"github.com/hyperledger/fabric/peer/version"
@@ -113,6 +114,7 @@ func main() {
 	mainCmd.AddCommand(chaincode.Cmd())
 	mainCmd.AddCommand(farmer.Cmd())
 	mainCmd.AddCommand(namesrv.Cmd())
+	mainCmd.AddCommand(fs.Cmd())
 
 	runtime.GOMAXPROCS(viper.GetInt("peer.gomaxprocs"))
 

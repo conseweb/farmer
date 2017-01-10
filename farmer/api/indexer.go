@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-martini/martini"
 	"github.com/go-xorm/xorm"
-	"github.com/hyperledger/fabric/farmer/indexer"
+	"github.com/hyperledger/fabric/storage/indexer"
 )
 
 type FileWrapper struct {
@@ -51,7 +51,20 @@ func GetFileAddr(ctx *RequestContext, orm *xorm.Engine, params martini.Params) {
 	ctx.rnd.JSON(200, FileWrapper{file, devs[0].Address})
 }
 
-// SetFileIndex /indexer/files/:device_id?clean=false clean old files in this deviceID
+// GetDeviceIndexer GET /indexer/devices/:device_id
+func GetDeviceIndexer(ctx *RequestContext, orm *xorm.Engine, params martini.Params) {
+	devID := params["device_id"]
+	files := []*indexer.FileInfo{}
+	err := orm.Where("device_id", devID).Find(&files)
+	if err != nil {
+		ctx.Error(500, err)
+		return
+	}
+
+	ctx.rnd.JSON(200, files)
+}
+
+// SetFileIndex POST /indexer/devices/:device_id?clean=false clean old files in this deviceID
 func SetFileIndex(ctx *RequestContext, orm *xorm.Engine, params martini.Params) {
 	devID := params["device_id"]
 	isClean, _ := strconv.ParseBool("clean")

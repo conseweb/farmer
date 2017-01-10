@@ -112,6 +112,7 @@ indexer:
     # file storage driver  'local', 'ipfs'
     fstype: local
     localChroot: /tmp/diego
+    address: "http://localhost:9375/"
 
 ###############################################################################
 #

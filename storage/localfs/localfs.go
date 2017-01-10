@@ -3,12 +3,15 @@ package localfs
 import (
 	"fmt"
 	"io"
+	// "net/http"
+	// "net/url"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/hyperledger/fabric/storage"
 	"github.com/op/go-logging"
+	"github.com/spf13/viper"
 	"golang.org/x/net/context"
 )
 
@@ -48,6 +51,24 @@ func NewDriver(rootPath string) (storage.StorageDriver, error) {
 		chroot: rootPath,
 	}, nil
 }
+
+func (d *Driver) Init(ctx context.Context) error {
+
+	indexAddr := viper.GetString("indexer.address")
+	if indexAddr == "" {
+		return fmt.Errorf("required indexer server address.")
+	}
+
+	// u, err := url.Parse(indexAddr)
+	// if err != nil {
+	// 	return err
+	// }
+
+	// cli := http.DefaultClient
+
+	return nil
+}
+
 func (d *Driver) Name() string {
 	return "local filesystem"
 }

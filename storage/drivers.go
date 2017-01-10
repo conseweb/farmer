@@ -9,6 +9,7 @@ import (
 type StorageDriver interface {
 	BaseFile
 
+	Init(ctx context.Context) error
 	GetContent(ctx context.Context, path string) ([]byte, error)
 	PutContent(ctx context.Context, path string, content []byte) error
 	Reader(ctx context.Context, path string) (io.ReadCloser, error)
