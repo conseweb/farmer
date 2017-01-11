@@ -106,25 +106,20 @@ func SetFileIndex(ctx *RequestContext, orm *xorm.Engine, params martini.Params) 
 }
 
 func UpdateFileIndex(ctx *RequestContext, orm *xorm.Engine, params martini.Params) {
-	file := &indexer.FileInfo{}
-	err := json.NewDecoder(ctx.req.Body).Decode(file)
+	body := indexer.MergeResult{}
+	// file := &indexer.FileInfo{}
+	err := json.NewDecoder(ctx.req.Body).Decode(&body)
 	if err != nil {
 		ctx.Error(400, err)
 		return
 	}
-
-	n, err := orm.Where("file_id = ?", file.ID).Update(file)
+	err = body.UpdateData(orm)
 	if err != nil {
 		ctx.Error(500, err)
 		return
 	}
 
-	if n == 0 {
-		ctx.Error(404, fmt.Errorf("not found file %v", file.ID))
-		return
-	}
-
-	ctx.Message(200, file)
+	ctx.Message(200, "ok")
 }
 
 func DeleteFileIndex(ctx *RequestContext, orm *xorm.Engine, params martini.Params) {
