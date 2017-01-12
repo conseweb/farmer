@@ -2,11 +2,12 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 
 	"github.com/go-martini/martini"
 	"github.com/go-xorm/xorm"
-	"github.com/hyperledger/fabric/farmer/indexer"
+	"github.com/hyperledger/fabric/storage/indexer"
 )
 
 type FileWrapper struct {
@@ -50,7 +51,20 @@ func GetFileAddr(ctx *RequestContext, orm *xorm.Engine, params martini.Params) {
 	ctx.rnd.JSON(200, FileWrapper{file, devs[0].Address})
 }
 
-// SetFileIndex /indexer/files/:device_id?clean=false clean old files in this deviceID
+// GetDeviceIndexer GET /indexer/devices/:device_id
+func GetDeviceIndexer(ctx *RequestContext, orm *xorm.Engine, params martini.Params) {
+	devID := params["device_id"]
+	files := []*indexer.FileInfo{}
+	err := orm.Where("device_id", devID).Find(&files)
+	if err != nil {
+		ctx.Error(500, err)
+		return
+	}
+
+	ctx.rnd.JSON(200, files)
+}
+
+// SetFileIndex POST /indexer/devices/:device_id?clean=false clean old files in this deviceID
 func SetFileIndex(ctx *RequestContext, orm *xorm.Engine, params martini.Params) {
 	devID := params["device_id"]
 	isClean, _ := strconv.ParseBool("clean")
@@ -68,6 +82,12 @@ func SetFileIndex(ctx *RequestContext, orm *xorm.Engine, params martini.Params) 
 			ctx.Error(500, err)
 			return
 		}
+	} else {
+		filePaths := []interface{}{}
+		for _, file := range files {
+			filePaths = append(filePaths, file.Path)
+		}
+		orm.Where("device_id = ?", devID).In("path", filePaths).Delete(&indexer.FileInfo{})
 	}
 
 	insrt := []interface{}{}
@@ -83,6 +103,44 @@ func SetFileIndex(ctx *RequestContext, orm *xorm.Engine, params martini.Params) 
 	}
 
 	ctx.Message(201, n)
+}
+
+func UpdateFileIndex(ctx *RequestContext, orm *xorm.Engine, params martini.Params) {
+	body := indexer.MergeResult{}
+	// file := &indexer.FileInfo{}
+	err := json.NewDecoder(ctx.req.Body).Decode(&body)
+	if err != nil {
+		ctx.Error(400, err)
+		return
+	}
+	err = body.UpdateData(orm)
+	if err != nil {
+		ctx.Error(500, err)
+		return
+	}
+
+	ctx.Message(200, "ok")
+}
+
+func DeleteFileIndex(ctx *RequestContext, orm *xorm.Engine, params martini.Params) {
+	fID, err := strconv.Atoi(params["file_id"])
+	if err != nil {
+		ctx.Error(400, "invalid params file_id")
+		return
+	}
+
+	n, err := orm.Where("file_id = ?", int64(fID)).Delete(&indexer.FileInfo{})
+	if err != nil {
+		ctx.Error(500, err)
+		return
+	}
+
+	if n == 0 {
+		ctx.Error(404, fmt.Errorf("not found file %v", fID))
+		return
+	}
+
+	ctx.Message(200, "ok")
 }
 
 func OnlineDevice(ctx *RequestContext, orm *xorm.Engine, params martini.Params) {

@@ -4,33 +4,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/go-xorm/xorm"
-	"github.com/op/go-logging"
 	"github.com/spf13/viper"
 )
-
-var (
-	log = logging.MustGetLogger("indexer")
-	orm *xorm.Engine
-)
-
-type FileInfo struct {
-	ID       int64  `xorm:"pk autoincr 'id'" json:"id"`
-	DeviceID string `xorm:"notnull index 'device_id'" json:"device_id"`
-	Path     string `xorm:"notnull index 'path'" json:"path"`
-	Hash     string `xorm:"notnull index 'hash'" json:"hash"`
-	Size     int64  `xorm:"'size'" json:"hash"`
-
-	Created time.Time `xorm:"created" json:"created"`
-	Updated time.Time `xorm:"updated" json:"updated"`
-}
-
-type Device struct {
-	ID      string `xorm:"pk" json:"id"`
-	Address string `xorm:"notnull index" json:"address"`
-}
 
 func InitDB() (*xorm.Engine, error) {
 	if orm != nil {

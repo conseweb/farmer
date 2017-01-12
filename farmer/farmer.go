@@ -3,9 +3,6 @@ package farmer
 import (
 	"github.com/hyperledger/fabric/farmer/api"
 	"github.com/hyperledger/fabric/farmer/daemon"
-	// "github.com/hyperledger/fabric/flogging"
-	// pb "github.com/conseweb/common/protos"
-	// "github.com/op/go-logging"
 )
 
 func StartFarmer() {

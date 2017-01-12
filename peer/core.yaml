@@ -99,6 +99,7 @@ farmer:
     id: hello
     supervisorAddress: 0.0.0.0:9376
     idproviderAddress: 172.16.1.3:7054
+    indexAddress: "http://u5.mj:9375/"
 
 
 ###############################################################################
@@ -111,6 +112,7 @@ indexer:
     # file storage driver  'local', 'ipfs'
     fstype: local
     localChroot: /tmp/diego
+    address: "http://localhost:9375/"
 
 ###############################################################################
 #

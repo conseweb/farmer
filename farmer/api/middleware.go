@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/go-martini/martini"
-	"github.com/hyperledger/fabric/farmer/indexer"
+	"github.com/hyperledger/fabric/storage/indexer"
 	"github.com/hyperledger/fabric/storage/localfs"
 	"github.com/spf13/viper"
 )
