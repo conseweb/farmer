@@ -74,7 +74,7 @@ func syncFsCmd() *cobra.Command {
 		Use:   "sync",
 		Short: "sync files from remote.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return nil
+			return syncFiles()
 		},
 	}
 
@@ -84,9 +84,9 @@ func syncFsCmd() *cobra.Command {
 func initFsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "init file system.",
+		Short: "init file system, use local file indexer.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return nil
+			return initFileSystem()
 		},
 	}
 

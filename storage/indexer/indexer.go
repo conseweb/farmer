@@ -29,12 +29,13 @@ type Device struct {
 }
 
 type Indexer struct {
-	cli   *http.Client
-	devID string
-	addr  string
+	cli    *http.Client
+	chroot string
+	devID  string
+	addr   string
 }
 
-func NewIndexer(addr, devID string) (*Indexer, error) {
+func NewIndexer(addr, devID, localChroot string) (*Indexer, error) {
 	_, err := url.Parse(addr)
 	if err != nil {
 		return nil, err
@@ -45,84 +46,11 @@ func NewIndexer(addr, devID string) (*Indexer, error) {
 	}
 
 	return &Indexer{
-		cli:   http.DefaultClient,
-		addr:  addr,
-		devID: devID,
+		cli:    http.DefaultClient,
+		addr:   addr,
+		devID:  devID,
+		chroot: localChroot,
 	}, nil
-}
-
-func (idx *Indexer) SendIndexer() error {
-	buf := make(chan *FileInfo, 10)
-	done := make(chan struct{})
-
-	go func() {
-		filepath.Walk("root", func(fp string, info os.FileInfo, e error) error {
-			if e != nil {
-				return e
-			}
-
-			hash := sha256.New()
-			f, err := os.Open(fp)
-			if err != nil {
-				return err
-			}
-			defer f.Close()
-
-			fi, err := f.Stat()
-			if err != nil {
-				return err
-			}
-			if fi.IsDir() {
-				return nil
-			}
-
-			_, err = io.Copy(hash, f)
-			if err != nil {
-				return err
-			}
-
-			buf <- &FileInfo{
-				DeviceID: idx.devID,
-				Path:     fp,
-				Hash:     fmt.Sprintf("%x", hash.Sum(nil)),
-				Size:     info.Size(),
-			}
-
-			return nil
-		})
-
-		var nl struct{}
-		done <- nl
-	}()
-
-	files := []*FileInfo{}
-	for {
-		select {
-		case fi := <-buf:
-			if len(files) < 10 {
-				files = append(files, fi)
-			} else {
-				err := idx.send(files)
-				if err != nil {
-					return err
-				}
-				files = []*FileInfo{}
-			}
-
-		case <-done:
-			if len(files) > 0 {
-				err := idx.send(files)
-				if err != nil {
-					return err
-				}
-			}
-
-			log.Debugf("Walk dir over.")
-			break
-		}
-	}
-
-	return nil
 }
 
 func (idx *Indexer) ListLocalAll() ([]*FileInfo, error) {
@@ -184,7 +112,7 @@ func (idx *Indexer) ListLocalAll() ([]*FileInfo, error) {
 		}
 	}()
 
-	filepath.Walk("/", func(fp string, info os.FileInfo, e error) error {
+	filepath.Walk(idx.chroot, func(fp string, info os.FileInfo, e error) error {
 		if e != nil {
 			log.Error(e)
 			return e
@@ -208,6 +136,30 @@ func (idx *Indexer) ListLocalAll() ([]*FileInfo, error) {
 	return files, nil
 }
 
+func (idx *Indexer) ListRemoteAll() ([]*FileInfo, error) {
+	u, _ := url.Parse(idx.addr)
+	u.Path = fmt.Sprintf("/devices/%s/", idx.devID)
+
+	resp, err := idx.cli.Get(u.String())
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode > 300 {
+		bs, _ := ioutil.ReadAll(resp.Body)
+		log.Errorf("Status: %v, body: %s", resp.Status, bs)
+		return nil, fmt.Errorf("%s", bs)
+	}
+
+	remoteFiles := []*FileInfo{}
+	err = json.NewDecoder(resp.Body).Decode(remoteFiles)
+	if err != nil {
+		return nil, err
+	}
+
+	return remoteFiles, nil
+}
+
 func (idx *Indexer) send(files []*FileInfo) error {
 	u, _ := url.Parse(idx.addr)
 	u.Path = fmt.Sprintf("/devices/%s/online", idx.devID)
@@ -228,6 +180,46 @@ func (idx *Indexer) send(files []*FileInfo) error {
 	}
 
 	log.Infof("Send over. %s", bs)
+	return nil
+}
+
+func (idx *Indexer) SyncLocalFS() error {
+	remoteFiles, err := idx.ListRemoteAll()
+	if err != nil {
+		return err
+	}
+
+	localFiles, err := idx.ListLocalAll()
+	if err != nil {
+		return err
+	}
+
+	ret, err := idx.mergeFiles(localFiles, remoteFiles)
+	if err != nil {
+		return err
+	}
+
+	for _, fi := range ret.Add {
+		err = fi.Download(idx)
+		if err != nil {
+			return fmt.Errorf("SyncLocalFS Download %s, %s", fi.Path, err)
+		}
+	}
+
+	for _, fi := range ret.Update {
+		err = fi.Download(idx)
+		if err != nil {
+			return fmt.Errorf("SyncLocalFS Update %s, %s", fi.Path, err)
+		}
+	}
+
+	for _, fi := range ret.Del {
+		err = fi.RemoveLocal(idx)
+		if err != nil {
+			return fmt.Errorf("SyncLocalFS Del %s, %s", fi.Path, err)
+		}
+	}
+
 	return nil
 }
 
@@ -259,23 +251,8 @@ func (idx *Indexer) Online() error {
 	return nil
 }
 
-func (idx *Indexer) SyncFiles() error {
-	u, _ := url.Parse(idx.addr)
-	u.Path = fmt.Sprintf("/devices/%s/", idx.devID)
-
-	resp, err := idx.cli.Get(u.String())
-	if err != nil {
-		return err
-	}
-
-	if resp.StatusCode > 300 {
-		bs, _ := ioutil.ReadAll(resp.Body)
-		log.Errorf("Status: %v, body: %s", resp.Status, bs)
-		return fmt.Errorf("%s", bs)
-	}
-
-	remoteFiles := []*FileInfo{}
-	err = json.NewDecoder(resp.Body).Decode(remoteFiles)
+func (idx *Indexer) SyncToRemote() error {
+	remoteFiles, err := idx.ListRemoteAll()
 	if err != nil {
 		return err
 	}
@@ -298,21 +275,21 @@ func (idx *Indexer) SyncFiles() error {
 	return nil
 }
 
-func (idx *Indexer) mergeFiles(remotes, locals []*FileInfo) (*MergeResult, error) {
+func (idx *Indexer) mergeFiles(bases, currents []*FileInfo) (*MergeResult, error) {
 	ret := &MergeResult{
 		Add:    []*FileInfo{},
 		Update: []*FileInfo{},
 		Del:    []*FileInfo{},
 	}
 
-	for i := 0; i < len(locals); i++ {
-		local := locals[i]
+	for i := 0; i < len(currents); i++ {
+		local := currents[i]
 		local.DeviceID = idx.devID
 		exists := false
 		var j int
 	loop_remote:
-		for ; j < len(remotes); j++ {
-			remote := remotes[j]
+		for ; j < len(bases); j++ {
+			remote := bases[j]
 			if remote.Hash == local.Hash && remote.Path == local.Path {
 				exists = true
 				break loop_remote
@@ -325,16 +302,16 @@ func (idx *Indexer) mergeFiles(remotes, locals []*FileInfo) (*MergeResult, error
 			}
 		}
 		if exists {
-			if j+1 < len(remotes) {
-				remotes = append(remotes[:j], remotes[j+1:]...)
+			if j+1 < len(bases) {
+				bases = append(bases[:j], bases[j+1:]...)
 			} else {
-				remotes = remotes[:j]
+				bases = bases[:j]
 			}
 		} else {
 			ret.Add = append(ret.Add, local)
 		}
 	}
-	for _, rem := range remotes {
+	for _, rem := range bases {
 		rem.DeviceID = idx.devID
 		ret.Del = append(ret.Del, rem)
 	}
