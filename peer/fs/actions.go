@@ -10,6 +10,7 @@ import (
 
 	"github.com/hyperledger/fabric/farmer/account"
 	"github.com/hyperledger/fabric/storage/indexer"
+	"github.com/spf13/viper"
 )
 
 func query(name string) error {
@@ -81,26 +82,43 @@ func setName(name, val string) error {
 }
 
 func syncFiles() error {
-
-	return nil
-}
-
-func initFileSystem() error {
-	acc, err := account.LoadFromFile()
+	idx, err := getLocalIndexer()
 	if err != nil {
 		return err
 	}
 
+	return idx.SyncLocalFS()
+}
+
+func initFileSystem() error {
+	idx, err := getLocalIndexer()
+	if err != nil {
+		return err
+	}
+
+	return idx.SyncToRemote()
+}
+
+func getLocalIndexer() (*indexer.Indexer, error) {
+	acc, err := account.LoadFromFile()
+	if err != nil {
+		return nil, err
+	}
+
 	if len(acc.Devices) > 0 {
-		return fmt.Errorf("required device.")
+		return nil, fmt.Errorf("required device.")
 	}
 
 	devID := acc.Devices[0].DeviceID
 
-	idx, err := indexer.NewIndexer(srvAddr, devID)
+	rootPath := viper.GetString("indexer.localChroot")
+	if rootPath == "" {
+		rootPath = "/tmp/diego"
+	}
+	idx, err := indexer.NewIndexer(srvAddr, devID, rootPath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return idx.SendIndexer()
+	return idx, nil
 }

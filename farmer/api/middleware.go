@@ -78,8 +78,8 @@ func SetFsDriverMW(rw http.ResponseWriter, req *http.Request, ctx *RequestContex
 		return
 	}
 
-	fstype := viper.GetString("farmer.fstype")
-	rootPath := viper.GetString("farmer.localChroot")
+	fstype := viper.GetString("indexer.fstype")
+	rootPath := viper.GetString("indexer.localChroot")
 	var err error
 
 	switch fstype {

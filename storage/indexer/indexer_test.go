@@ -38,7 +38,7 @@ func TestCompare(t *testing.T) {
 		},
 	}
 
-	ind, _ := NewIndexer("http://a.com/", "devID")
+	ind, _ := NewIndexer("http://a.com/", "devID", "/")
 	ret, err := ind.mergeFiles(comp.rem, comp.loc)
 	if err != nil {
 		t.Error(err)
