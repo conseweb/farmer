@@ -74,10 +74,7 @@ func (d *Driver) Name() string {
 }
 
 func (d *Driver) GetContent(ctx context.Context, path string) ([]byte, error) {
-	fpath, err := d.Abs(path)
-	if err != nil {
-		return nil, err
-	}
+	fpath := d.Abs(path)
 	_ = fpath
 
 	return nil, nil
@@ -88,22 +85,16 @@ func (d *Driver) PutContent(ctx context.Context, path string, content []byte) er
 }
 
 func (d *Driver) Reader(ctx context.Context, path string) (io.ReadCloser, error) {
-	fpath, err := d.Abs(path)
-	if err != nil {
-		return nil, err
-	}
+	fpath := d.Abs(path)
 
 	return os.Open(fpath)
 }
 
 func (d *Driver) Writer(ctx context.Context, path string, isAppend bool) (io.WriteCloser, error) {
-	fpath, err := d.Abs(path)
-	if err != nil {
-		return nil, err
-	}
+	fpath := d.Abs(path)
 
 	var flag int
-	_, err = d.Stat(ctx, fpath)
+	_, err := d.Stat(ctx, fpath)
 	if err != nil && os.IsNotExist(err) {
 		flag = os.O_CREATE | os.O_WRONLY
 	} else if err != nil {
@@ -118,35 +109,37 @@ func (d *Driver) Writer(ctx context.Context, path string, isAppend bool) (io.Wri
 }
 
 func (d *Driver) Stat(ctx context.Context, path string) (storage.FileInfo, error) {
-	fpath, err := d.Abs(path)
-	if err != nil {
-		return nil, err
-	}
+	fpath := d.Abs(path)
 
 	fi, err := os.Stat(fpath)
 	if err != nil {
 		return nil, err
+	}
+
+	if fi.IsDir() {
+		size := d.sizeDir(fpath)
+		return storage.NewFI(strings.TrimPrefix(fi.Name(), d.chroot), size, fi.ModTime(), fi.IsDir()), nil
 	}
 
 	return storage.NewOSFI(fi, d.chroot), nil
 }
 
 func (d *Driver) List(ctx context.Context, path string) ([]storage.FileInfo, error) {
-	fpath, err := d.Abs(path)
-	if err != nil {
-		return nil, err
-	}
+	fpath := d.Abs(path)
 
-	fi, err := os.Stat(fpath)
+	fi, err := d.Stat(ctx, path)
 	if err != nil {
 		return nil, err
 	}
 	if !fi.IsDir() {
-		return []storage.FileInfo{storage.NewOSFI(fi, d.chroot)}, nil
+		return []storage.FileInfo{fi}, nil
 	}
 
 	ret := []storage.FileInfo{}
 	filepath.Walk(fpath, func(p string, info os.FileInfo, err error) error {
+		if info.IsDir() {
+			return nil
+		}
 		ret = append(ret, storage.NewFI(strings.TrimPrefix(p, d.chroot), info.Size(), info.ModTime(), info.IsDir()))
 		return err
 	})
@@ -155,10 +148,7 @@ func (d *Driver) List(ctx context.Context, path string) ([]storage.FileInfo, err
 }
 
 func (d *Driver) Mkdir(ctx context.Context, path string) error {
-	fpath, err := d.Abs(path)
-	if err != nil {
-		return err
-	}
+	fpath := d.Abs(path)
 
 	return os.MkdirAll(fpath, 0644)
 }
@@ -168,24 +158,34 @@ func (d *Driver) Move(ctx context.Context, sourcePath string, destPath string) e
 }
 
 func (d *Driver) Delete(ctx context.Context, path string) error {
-	fpath, err := d.Abs(path)
-	if err != nil {
-		return err
-	}
+	fpath := d.Abs(path)
 
 	return os.RemoveAll(fpath)
 }
 
-func (d *Driver) Abs(path string) (string, error) {
-	absPath, err := filepath.Abs(d.chroot + "/" + strings.TrimPrefix(path, "/"))
-	if err != nil {
-		log.Errorf("Abs %s, %s", path, err)
-		return "", err
+func (d *Driver) Abs(path string) string {
+	if strings.HasPrefix(path, d.chroot) {
+		return path
 	}
 
-	if !strings.HasPrefix(absPath, d.chroot) {
-		return "", fmt.Errorf("%s not exists", path)
+	fp := filepath.Join(d.chroot, path)
+	if !strings.HasPrefix(fp, d.chroot) {
+		return d.chroot
 	}
+	return fp
+}
 
-	return absPath, nil
+func (d *Driver) sizeDir(dir string) int64 {
+	var size int64
+
+	filepath.Walk(d.Abs(dir), func(fp string, info os.FileInfo, e error) error {
+		if e != nil {
+			log.Error(e)
+			return e
+		}
+		size += info.Size()
+		return nil
+	})
+
+	return size
 }

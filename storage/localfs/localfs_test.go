@@ -31,12 +31,8 @@ func TestAbx(t *testing.T) {
 		"/a/..":    testData{chroot + "", false},
 		"/a/../..": testData{chroot + "", true},
 	} {
-		val, err := fs.Abs(k)
-		if v.isErr {
-			if err == nil {
-				t.Errorf("%s should be returned error", k)
-			}
-		} else if val != v.val {
+		val := fs.Abs(k)
+		if val != v.val {
 			t.Errorf("%s should be %s, but %s", k, v.val, val)
 		}
 	}
