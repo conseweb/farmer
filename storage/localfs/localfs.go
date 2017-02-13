@@ -3,8 +3,6 @@ package localfs
 import (
 	"fmt"
 	"io"
-	// "net/http"
-	// "net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,6 +20,8 @@ var (
 type Driver struct {
 	chroot string
 }
+
+var _ storage.StorageDriver = &Driver{}
 
 func NewDriver(rootPath string) (storage.StorageDriver, error) {
 	var err error
